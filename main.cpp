@@ -1,8 +1,8 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
 #include <netdb.h>
+
 
 static int domainIpResolver(void)
 {
