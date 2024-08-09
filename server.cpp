@@ -13,37 +13,44 @@
 #define PORT "4242"
 #define BACKLOG 10
 
-int main(void)
+static int  createServerSocket(void)
 {
-    std::cout << "[SERVER]" << std::endl;
-
-    int status;
-    int socket_fd;
-
-    addrinfo hint;
-    addrinfo *res;
+    int         status;
+    int         server_socket;
+    addrinfo    hint;
+    addrinfo    *res;
 
     memset(&hint, 0, sizeof(hint));
     hint.ai_family = AF_UNSPEC;
-    hint.ai_socktype = SOCK_STREAM;
+    hint.ai_socktype = SOCK_STREAM; // TCP OU UDP.
     hint.ai_flags = AI_PASSIVE;
 
     status = getaddrinfo(NULL, PORT, &hint, &res);
     if (status != 0)
     {
-        std::cout << "getaddrinfo : " << gai_strerror(status) << std::endl;
+        std::cout << RED << "getaddrinfo : " << gai_strerror(status) << RESET << std::endl;
         return (1);
     }
-    socket_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    std::cout << PURPLE << "Created server socket_fd = " << socket_fd << RESET << std::endl;
+    server_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    std::cout << PURPLE << "Created server socket_fd = " << server_socket << RESET << std::endl;
 
-    status = bind(socket_fd, res->ai_addr, res->ai_addrlen);
+    status = bind(server_socket, res->ai_addr, res->ai_addrlen);
     if (status != 0)
     {
         std::cout << "bind : " << std::strerror(errno) << std::endl;
         return (1);
     }
     std::cout << PURPLE << "Server socket_fd boud to localhost on port : " << PORT << RESET << std::endl;
+    return (server_socket);
+}
+
+int main(void)
+{
+    std::cout << "[SERVER]" << std::endl;
+
+    int socket_fd = createServerSocket();
+    if (socket_fd == 1)
+        return (1);
 
     listen(socket_fd, BACKLOG);
     std::cout << PURPLE << "Listening on port " << PORT << " ..." << RESET << std::endl;

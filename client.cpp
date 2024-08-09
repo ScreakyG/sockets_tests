@@ -9,10 +9,8 @@
 
 #include "colors.hpp"
 
-int main(int argc, char** argv)
+static int  createServerSocket(void)
 {
-    std::cout << "[CLIENT]" << std::endl;
-
     int status;
     int socket_fd;
     addrinfo    hint;
@@ -42,6 +40,16 @@ int main(int argc, char** argv)
         std::cout << RED << "Error client connection : " << gai_strerror(status) << RESET << std::endl;
         return (1);
     }
+    return (socket_fd);
+}
+
+int main(int argc, char** argv)
+{
+    std::cout << "[CLIENT]" << std::endl;
+
+    int socket_fd = createServerSocket();
+    if (socket_fd == 1)
+        return (1);
 
     // Sending message to server. //
     char *msg = argv[1];
