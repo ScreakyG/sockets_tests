@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <cstdio>
 
+#include "colors.hpp"
+
 int main(int argc, char** argv)
 {
     std::cout << "[CLIENT]" << std::endl;
@@ -23,19 +25,21 @@ int main(int argc, char** argv)
     status = getaddrinfo(NULL, "4242", &hint, &res);
     if (status != 0)
     {
-        std::cout << "getaddrinfo : "<< gai_strerror(status) << std::endl;
+        std::cout << RED << "getaddrinfo : "<< gai_strerror(status) << RESET << std::endl;
         return (1);
     }
     socket_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (socket_fd == -1)
     {
-        std::cout << "Socket problem : " << std::strerror(errno) << std::endl;
+        std::cout << RED << "Socket problem : " << std::strerror(errno) << RESET << std::endl;
         return (1);
     }
+    std::cout << PURPLE << "Server socket_fd is : " << socket_fd  << RESET << std::endl;
+
     status = connect(socket_fd, res->ai_addr, res->ai_addrlen);
     if (status != 0)
     {
-        std::cout << "Error client connection : " << gai_strerror(status) << std::endl;
+        std::cout << RED << "Error client connection : " << gai_strerror(status) << RESET << std::endl;
         return (1);
     }
 
@@ -46,11 +50,11 @@ int main(int argc, char** argv)
 
     bytes_send = send(socket_fd, msg, msg_len, 0);
     if (bytes_send == -1)
-        std::cout << "Error when sending message to server : " << std::strerror(errno) << std::endl;
+        std::cout << RED <<"[Me] Error when sending message to server : " << std::strerror(errno) << RESET << std::endl;
     else if (bytes_send == msg_len)
-        std::cout << "Client sent full message to server" << std::endl;
+        std::cout << GREEN << "[Me] Client sent full message to server" << RESET << std::endl;
     else
-        std::cout << "Client sent partial message to server" << std::endl;
+        std::cout << YELLOW << "[Me] Client sent partial message to server" << RESET << std::endl;
 
 
     // Receiving message from server. //
@@ -66,13 +70,13 @@ int main(int argc, char** argv)
         }
         else if (bytes_read == -1)
         {
-            std::cout << "Client recv error : " << std::strerror(errno) << std::endl;
+            std::cout << RED << "Client recv error : " << std::strerror(errno) << RESET << std::endl;
             break ;
         }
         else
         {
             buffer[bytes_read] = '\0';
-            std::cout << "Message from server : " << buffer << std::endl;
+            std::cout << CYAN << "[Server] Message from server : " << buffer << RESET << std::endl;
             break ;
         }
     }

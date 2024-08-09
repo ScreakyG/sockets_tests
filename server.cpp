@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <unistd.h>
 
+#include "colors.hpp"
+
 #define PORT "4242"
 #define BACKLOG 10
 
@@ -33,7 +35,7 @@ int main(void)
         return (1);
     }
     socket_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    std::cout << "Created server socket_fd = " << socket_fd << std::endl;
+    std::cout << PURPLE << "Created server socket_fd = " << socket_fd << RESET << std::endl;
 
     status = bind(socket_fd, res->ai_addr, res->ai_addrlen);
     if (status != 0)
@@ -41,10 +43,10 @@ int main(void)
         std::cout << "bind : " << std::strerror(errno) << std::endl;
         return (1);
     }
-    std::cout << "Server socket_fd boud to localhost on port : " << PORT << std::endl;
+    std::cout << PURPLE << "Server socket_fd boud to localhost on port : " << PORT << RESET << std::endl;
 
     listen(socket_fd, BACKLOG);
-    std::cout << "Listening on port " << PORT << " ..." << std::endl;
+    std::cout << PURPLE << "Listening on port " << PORT << " ..." << RESET << std::endl;
 
     int client_fd;
     sockaddr_storage    clientAddr;
@@ -53,10 +55,10 @@ int main(void)
     client_fd = accept(socket_fd, reinterpret_cast<sockaddr*>(&clientAddr), &addrSize);
     if (client_fd == -1)
     {
-        std::cout << "accept : " << std::strerror(errno) << std::endl;
+        std::cout << RED << "accept : " << std::strerror(errno) << RESET << std::endl;
         return (1);
     }
-    std::cout << "Accepted client, client_socket_fd =  " << client_fd << std::endl;
+    std::cout << PURPLE << "Accepted client, client_socket_fd =  " << client_fd << RESET << std::endl;
 
     // RECEVOIR UN MESSAGE DU CLIENT. //
 
@@ -64,11 +66,11 @@ int main(void)
     char    buffer[BUFSIZ];
     while (readedBytes >= 0)
     {
-        std::cout << "[" << client_fd << "]" << " : Reading ... " << std::endl;
+        std::cout << GREEN << "[" << client_fd << "]" << " : Reading ... "  << RESET << std::endl;
         readedBytes = recv(client_fd, buffer, BUFSIZ, 0);
         if (readedBytes == -1)
         {
-            std::cout << "recv error : " << std::strerror(errno) << std::endl;
+            std::cout << RED << "recv error : " << std::strerror(errno) << RESET << std::endl;
             break ;
         }
         else if (readedBytes == 0)
@@ -82,15 +84,15 @@ int main(void)
             int sentBytes;
 
             buffer[readedBytes] = '\0';
-            std::cout << "[" << client_fd << "]" << " : Message = " << buffer << std::endl;
+            std::cout << CYAN << "[" << client_fd << "]" << " : Message = " << buffer << RESET << std::endl;
 
             sentBytes = send(client_fd, msg.c_str(), msg.size(), 0);
             if (sentBytes == -1)
-                std::cout << "sending error : " << std::strerror(errno) << std::endl;
+                std::cout << RED << "sending error : " << std::strerror(errno) << RESET << std::endl;
             else if (sentBytes == static_cast<int>(msg.size()))
-                std::cout << "Full message was sent to client " << client_fd << " : " << msg << std::endl;
+                std::cout << GREEN << "Full message was sent to client " << client_fd << " : " << msg << RESET << std::endl;
             else
-                std::cout << "Partial message was sent to client." << std::endl;
+                std::cout << YELLOW << "Partial message was sent to client." << RESET << std::endl;
         }
     }
     std::cout << "Closing client socket" << std::endl;
