@@ -8,6 +8,12 @@
 #include <cstdio>
 #include <unistd.h>
 
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
+#include <stdlib.h>
+#include <sstream>
 #include "colors.hpp"
 
 #define PORT "4242"
@@ -44,67 +50,125 @@ static int  createServerSocket(void)
     return (server_socket);
 }
 
+static void accept_new_connection(int server_socket, fd_set *all_sockets, int *fd_max)
+{
+    int client_fd;
+
+    client_fd = accept(server_socket, NULL, NULL);
+    if (client_fd == -1)
+    {
+        std::cout << RED << "accept : " << std::strerror(errno) << RESET << std::endl;
+        return ;
+    }
+    FD_SET(client_fd, all_sockets); // Ajoute le nouveau socket client a la liste de tout les sockets.
+    if (client_fd > *fd_max) // Si le nouveau client fd est plus grand le serveur alors on change le fd_max.
+        *fd_max = client_fd;
+    std::cout << "[Server] Accepted new connection on client socket " << client_fd << std::endl;
+
+    // On envoie un message de bienvenue au client.
+    int                 sentBytes;
+    std::stringstream   ss;
+
+    ss << "Welcome, you are the client " << client_fd << std::endl;
+    std::string msg = ss.str();
+    sentBytes = send(client_fd, msg.c_str(), msg.size(), 0);
+
+    if (sentBytes == -1)
+            std::cout << RED << "[Server] sending error : " << std::strerror(errno) << RESET << std::endl;
+    else if (sentBytes != static_cast<int>(msg.size()))
+            std::cout << YELLOW << "[Server] Partial message was sent to client." << RESET << std::endl;
+
+}
+
+static void handle_client(int socket, fd_set *all_sockets, int fd_max, int server_socket)
+{
+    int     status;
+    int     readedBytes = 1;
+    char    buffer[BUFSIZ];
+
+    std::stringstream   ss;
+    std::string         msg;
+
+    memset(&buffer, '\0', sizeof (buffer));
+    readedBytes = recv(socket, buffer, BUFSIZ, 0);
+    if (readedBytes <= 0)
+    {
+        if (readedBytes == -1)
+            std::cout << RED << "[Server] recv error : " << std::strerror(errno) << RESET << std::endl;
+        else if (readedBytes == 0)
+            std::cout << "[" << socket << "]" << " : Closed connection." << std::endl;
+        close(socket);
+        FD_CLR(socket, all_sockets);
+    }
+    else
+    {
+        ss << "[" << socket <<  "]" << " : " << buffer;
+        msg = ss.str();
+        for (int i = 0; i <= fd_max; i++)
+        {
+            if (FD_ISSET(i, all_sockets) && i != server_socket && i != socket)
+            {
+                status = send(i, msg.c_str(), msg.size(), 0);
+                if (status == -1)
+                    std::cout << RED << "[Server] sending error to client  " << i << " : " << std::strerror(errno) << RESET << std::endl;
+            }
+        }
+    }
+}
+
 int main(void)
 {
     std::cout << "[SERVER]" << std::endl;
 
-    int socket_fd = createServerSocket();
-    if (socket_fd == 1)
+    fd_set          all_sockets;
+    fd_set          read_fds;
+    int             fd_max;
+    struct  timeval timer;
+
+    int             status;
+
+    int server_socket = createServerSocket();
+    if (server_socket == 1)
         return (1);
 
-    listen(socket_fd, BACKLOG);
+    listen(server_socket, BACKLOG);
     std::cout << PURPLE << "Listening on port " << PORT << " ..." << RESET << std::endl;
 
-    int client_fd;
-    sockaddr_storage    clientAddr;
-    socklen_t           addrSize = sizeof(clientAddr);
 
-    client_fd = accept(socket_fd, reinterpret_cast<sockaddr*>(&clientAddr), &addrSize);
-    if (client_fd == -1)
+    FD_ZERO(&all_sockets); // Initialise la liste des sockets a 0.
+    FD_ZERO(&read_fds);    // Initialise la liste des reads sockets a 0.
+    FD_SET(server_socket, &all_sockets); // Ajoute le socket du server dans la liste de tout les sockets.
+    fd_max = server_socket; // Le descripteur de fichier le plus grand est le dernier creer , donc le serveur.
+
+    while (1)
     {
-        std::cout << RED << "accept : " << std::strerror(errno) << RESET << std::endl;
-        return (1);
-    }
-    std::cout << PURPLE << "Accepted client, client_socket_fd =  " << client_fd << RESET << std::endl;
+        read_fds = all_sockets;
+        timer.tv_sec = 2; // Timeout de 2 sec pour select().
+        timer.tv_usec = 0;
 
-    // RECEVOIR UN MESSAGE DU CLIENT. //
-
-    int     readedBytes = 1;
-    char    buffer[BUFSIZ];
-    while (readedBytes >= 0)
-    {
-        std::cout << GREEN << "[" << client_fd << "]" << " : Reading ... "  << RESET << std::endl;
-        readedBytes = recv(client_fd, buffer, BUFSIZ, 0);
-        if (readedBytes == -1)
+        status = select(fd_max + 1, &read_fds, NULL, NULL, &timer);
+        if (status == -1)
         {
-            std::cout << RED << "recv error : " << std::strerror(errno) << RESET << std::endl;
-            break ;
+            std::cout << RED << "[Server] Select error : " << std::strerror(errno) << RESET << std::endl;
+            exit(1);
         }
-        else if (readedBytes == 0)
+        else if (status == 0) // Auncun descripteur de fichier socket n'est pret pour la lecture.
         {
-            std::cout << "[" << client_fd << "]" << " : Closed connection. " << std::endl;
-            break ;
+            std::cout << "[Server] Waiting... " << std::endl;
+            continue ;
         }
-        else
+
+        // Sinon on boucle sur les sockets et on traite ceux qui sont prets.
+        for (int i = 0; i <= fd_max; i++)
         {
-            std::string msg = "Got your message.";
-            int sentBytes;
-
-            buffer[readedBytes] = '\0';
-            std::cout << CYAN << "[" << client_fd << "]" << " : Message = " << buffer << RESET << std::endl;
-
-            sentBytes = send(client_fd, msg.c_str(), msg.size(), 0);
-            if (sentBytes == -1)
-                std::cout << RED << "sending error : " << std::strerror(errno) << RESET << std::endl;
-            else if (sentBytes == static_cast<int>(msg.size()))
-                std::cout << GREEN << "Full message was sent to client " << client_fd << " : " << msg << RESET << std::endl;
+            if (FD_ISSET(i, &read_fds) != 1)
+                continue ; // Le fd i n'est pas une socket a surveiller alors on continue.
+            std::cout << "[" << i << "]" << " Ready for I/O operation" << std::endl;
+            if (i == server_socket)
+                accept_new_connection(server_socket, &all_sockets, &fd_max); // Accepter une nouvelle socket client.
             else
-                std::cout << YELLOW << "Partial message was sent to client." << RESET << std::endl;
+                handle_client(i, &all_sockets, fd_max, server_socket);// Lire la socket client correspondant a i.
         }
     }
-    std::cout << "Closing client socket" << std::endl;
-    close(client_fd);
-    std::cout << "Closing server socket" << std::endl;
-    close(socket_fd);
     return (0);
 }
